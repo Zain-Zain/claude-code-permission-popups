@@ -78,6 +78,8 @@ final class HookInstallFlow {
         alert.accessoryView = scroll
         alert.addButton(withTitle: "Install")
         alert.addButton(withTitle: "Cancel")
+        // The user chose Install from the menu: bring the confirmation to the front.
+        NSApp.activate(ignoringOtherApps: true)
         return alert.runModal() == .alertFirstButtonReturn
     }
 }

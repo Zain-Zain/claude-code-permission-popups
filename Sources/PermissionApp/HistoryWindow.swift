@@ -53,6 +53,8 @@ final class HistoryWindowController: NSObject {
         alert.alertStyle = .warning
         alert.addButton(withTitle: "Clear History")
         alert.addButton(withTitle: "Cancel")
+        // The user clicked Clear History: keep the confirmation in front.
+        NSApp.activate(ignoringOtherApps: true)
         if let window {
             alert.beginSheetModal(for: window) { [weak self] response in
                 if response == .alertFirstButtonReturn { self?.model.clear() }

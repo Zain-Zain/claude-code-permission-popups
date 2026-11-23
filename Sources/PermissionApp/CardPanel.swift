@@ -31,25 +31,39 @@ final class CardPanel: NSPanel {
         isReleasedWhenClosed = false
         isMovable = false
         animationBehavior = .none
+        // Cards keep taking clicks while one of the app's own alerts is up (menu actions).
+        worksWhenModal = true
     }
 
-    /// True so a click can make the card key without activating the app.
-    override var canBecomeKey: Bool { keyable && !dismissed }
-
+    /// Set by a mouse-down on this card, cleared when it stops being key or is dismissed.
+    private var clickArmed = false
     private var dismissed = false
 
-    /// Called when the card starts fading out: it must stop taking keystrokes at once, so a
-    /// key card that is being dismissed gives up key status and can never become key again.
+    /// Only a mouse-down on this card can make it key. When another window closes or
+    /// orders out, AppKit looks for a new key window; every card refuses, so a card the
+    /// user never clicked can never receive their keystrokes.
+    override var canBecomeKey: Bool { keyable && clickArmed && !dismissed }
+    override var canBecomeMain: Bool { false }
+
+    override func resignKey() {
+        super.resignKey()
+        clickArmed = false
+    }
+
+    /// Called when the card starts fading out: it stops taking keystrokes at once and can
+    /// never become key again. A key card leaves the screen now (skipping the fade), which
+    /// is the supported way to give up key status.
     func markDismissed() {
         dismissed = true
-        if isKeyWindow { resignKey() }
+        clickArmed = false
+        if isKeyWindow { orderOut(nil) }
     }
-    override var canBecomeMain: Bool { false }
 
     /// Return/Enter and Escape are taken here, before any view (such as the selectable
     /// command text) can consume them, so each press triggers exactly one decision.
     /// Key events only reach a window that is key, so this acts on the clicked card alone.
     override func sendEvent(_ event: NSEvent) {
+        if event.type == .leftMouseDown { clickArmed = true } // before super makes it key
         if event.type == .keyDown, handleDecisionKey(event) { return }
         super.sendEvent(event)
     }

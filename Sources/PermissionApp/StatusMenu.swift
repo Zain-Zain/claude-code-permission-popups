@@ -182,6 +182,8 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         alert.messageText = title
         alert.informativeText = detail
         alert.alertStyle = .warning
+        // Menu actions only: bring the alert to the front so it cannot hide behind other apps.
+        NSApp.activate(ignoringOtherApps: true)
         alert.runModal()
     }
 }
