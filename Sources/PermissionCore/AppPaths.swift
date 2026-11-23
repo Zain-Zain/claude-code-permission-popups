@@ -3,9 +3,18 @@ import Foundation
 public enum AppPaths {
     public static let bundleIdentifier = "local.permission-popups"
 
+    /// The home directory. `homeDirectoryForCurrentUser` ignores `HOME`, so `HOME` is
+    /// honoured explicitly when it is a non-empty absolute path.
+    public static var homeDirectory: URL {
+        if let home = ProcessInfo.processInfo.environment["HOME"], home.hasPrefix("/") {
+            return URL(fileURLWithPath: home, isDirectory: true)
+        }
+        return FileManager.default.homeDirectoryForCurrentUser
+    }
+
     /// `~/Library/Application Support/local.permission-popups`
     public static var supportDirectory: URL {
-        FileManager.default.homeDirectoryForCurrentUser
+        homeDirectory
             .appendingPathComponent("Library/Application Support", isDirectory: true)
             .appendingPathComponent(bundleIdentifier, isDirectory: true)
     }

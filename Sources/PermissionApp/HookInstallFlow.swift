@@ -9,14 +9,9 @@ final class HookInstallFlow {
     let settingsURL: URL
     let helperPath: String
 
-    /// `~/.claude/settings.json`. `homeDirectoryForCurrentUser` ignores `HOME` (it reads the
-    /// user database), so `HOME` is honoured explicitly: that lets the flow be exercised
-    /// against a scratch home directory.
+    /// `~/.claude/settings.json`, following `HOME` (see `AppPaths.homeDirectory`).
     static var settingsURL: URL {
-        let home = ProcessInfo.processInfo.environment["HOME"].flatMap { $0.isEmpty ? nil : $0 }
-            .map { URL(fileURLWithPath: $0, isDirectory: true) }
-            ?? FileManager.default.homeDirectoryForCurrentUser
-        return home
+        AppPaths.homeDirectory
             .appendingPathComponent(".claude", isDirectory: true)
             .appendingPathComponent("settings.json")
     }
@@ -40,7 +35,7 @@ final class HookInstallFlow {
     }
 
     var status: HookStatus {
-        HookSettings.status(of: try? Data(contentsOf: settingsURL), helperPath: helperPath)
+        HookSettings.status(of: try? SettingsFile(url: settingsURL).read(), helperPath: helperPath)
     }
 
     /// The exact entry that will be added, as pretty JSON.
@@ -53,18 +48,16 @@ final class HookInstallFlow {
 
     /// Asks for confirmation (unless told not to), then installs. Declining is not an error.
     func install(presentingConfirm: Bool = true) throws {
-        let existing = Self.read(settingsURL)
-        // Compute first: if the file is unusual this throws before anything is touched.
-        let updated = try HookSettings.install(into: existing, helperPath: helperPath)
-        if presentingConfirm, !confirmInstall() { return }
-        try write(updated, replacing: existing)
+        try SettingsFile(url: settingsURL).update(
+            confirm: presentingConfirm ? { [self] in confirmInstall() } : nil,
+            compute: { try HookSettings.install(into: $0, helperPath: helperPath) })
     }
 
     func uninstall() throws {
-        guard let existing = Self.read(settingsURL) else { return }
-        let updated = try HookSettings.uninstall(from: existing, helperPath: helperPath)
-        guard updated != existing else { return }
-        try write(updated, replacing: existing)
+        try SettingsFile(url: settingsURL).update { existing in
+            guard let existing else { return nil }
+            return try HookSettings.uninstall(from: existing, helperPath: helperPath)
+        }
     }
 
     // MARK: - Confirmation
@@ -86,46 +79,6 @@ final class HookInstallFlow {
         alert.addButton(withTitle: "Install")
         alert.addButton(withTitle: "Cancel")
         return alert.runModal() == .alertFirstButtonReturn
-    }
-
-    // MARK: - File handling
-
-    private static func read(_ url: URL) -> Data? {
-        try? Data(contentsOf: url)
-    }
-
-    private func write(_ data: Data, replacing existing: Data?) throws {
-        let fm = FileManager.default
-        let directory = settingsURL.deletingLastPathComponent()
-        if !fm.fileExists(atPath: directory.path) {
-            try fm.createDirectory(at: directory, withIntermediateDirectories: true,
-                                   attributes: [.posixPermissions: 0o700])
-        }
-
-        var permissions = 0o600
-        if fm.fileExists(atPath: settingsURL.path) {
-            permissions = (try fm.attributesOfItem(atPath: settingsURL.path)[.posixPermissions] as? Int) ?? 0o600
-            try backUp(permissions: permissions)
-        }
-        try data.write(to: settingsURL, options: .atomic)
-        try fm.setAttributes([.posixPermissions: permissions], ofItemAtPath: settingsURL.path)
-    }
-
-    /// Copies to `settings.json.bak-<yyyyMMdd-HHmmss>`, adding `-2`, `-3`… if that name is taken.
-    private func backUp(permissions: Int) throws {
-        let fm = FileManager.default
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = "yyyyMMdd-HHmmss"
-        let base = settingsURL.path + ".bak-" + formatter.string(from: Date())
-        var target = base
-        var n = 2
-        while fm.fileExists(atPath: target) {
-            target = "\(base)-\(n)"
-            n += 1
-        }
-        try fm.copyItem(atPath: settingsURL.path, toPath: target)
-        try fm.setAttributes([.posixPermissions: permissions], ofItemAtPath: target)
     }
 }
 

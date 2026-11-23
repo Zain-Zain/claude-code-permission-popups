@@ -46,8 +46,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         statusMenu = StatusMenu(prefs: prefs, queue: queue, panels: panels, historyStore: history)
 
-        statusMenu = StatusMenu(prefs: prefs, queue: queue, panels: panels, historyStore: history)
-
         let server = SocketServer(path: AppPaths.socketPath) { [weak self] wire, responder in
             self?.handle(wire, responder: responder)
         }
