@@ -21,6 +21,8 @@ public final class SocketServer {
     private let lock = NSLock()
     private var state = State.idle
     private var listenSource: DispatchSourceRead?
+    /// True while the listen source is suspended for accept back-off. Guarded by `lock`.
+    private var listenSuspended = false
     private var boundFile: (dev: dev_t, ino: ino_t)?
     private var connections: [UUID: SocketResponder] = [:]
 
@@ -84,6 +86,8 @@ public final class SocketServer {
     public func stop() {
         lock.lock()
         let source = listenSource
+        let wasSuspended = listenSuspended
+        listenSuspended = false
         let open = Array(connections.values)
         let file = boundFile
         listenSource = nil
@@ -92,6 +96,8 @@ public final class SocketServer {
         state = .stopped
         lock.unlock()
 
+        // A suspended source cannot be cancelled cleanly: resume it first.
+        if wasSuspended { source?.resume() }
         source?.cancel()
         for connection in open { connection.forceClose() }
         // Only remove the file if it is still the one we bound (not a newer instance's socket).
@@ -107,6 +113,9 @@ public final class SocketServer {
             let fd = accept(listenFD, nil, nil)
             if fd < 0 {
                 if errno == EINTR || errno == ECONNABORTED { continue }
+                if errno == EMFILE || errno == ENFILE || errno == ENOBUFS {
+                    backOffAccepting()
+                }
                 return // EAGAIN: drained. Anything else: retry on the next event.
             }
             UnixSocket.configure(fd, nonBlocking: true)
@@ -138,6 +147,27 @@ public final class SocketServer {
             connections[connection.id] = connection
             lock.unlock()
             connection.begin()
+        }
+    }
+
+    /// Out of descriptors or buffers: the level-triggered listen source would re-fire at once
+    /// and spin. Pause it and resume shortly, unless `stop()` ran in between.
+    private func backOffAccepting() {
+        lock.lock()
+        guard state == .running, !listenSuspended, let source = listenSource else {
+            lock.unlock()
+            return
+        }
+        listenSuspended = true
+        source.suspend()
+        lock.unlock()
+        acceptQueue.asyncAfter(deadline: .now() + .milliseconds(100)) { [weak self] in
+            guard let self else { return }
+            self.lock.lock()
+            defer { self.lock.unlock() }
+            guard self.listenSuspended, self.state == .running, let source = self.listenSource else { return }
+            self.listenSuspended = false
+            source.resume()
         }
     }
 
@@ -310,8 +340,11 @@ public final class SocketResponder {
             close(fd)
         }
         finished(id)
-        if outcome == .peerClosed {
-            DispatchQueue.main.async { self.onClose?() }
+        // onClose is set and cleared on main. Clearing it breaks retain cycles through captures.
+        DispatchQueue.main.async {
+            let callback = self.onClose
+            self.onClose = nil
+            if outcome == .peerClosed { callback?() }
         }
     }
 }

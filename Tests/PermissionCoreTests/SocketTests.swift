@@ -14,6 +14,8 @@ private final class Box<T>: @unchecked Sendable {
     func mutate(_ body: (inout T) -> Void) { lock.lock(); body(&stored); lock.unlock() }
 }
 
+private struct WeakResponder { weak var object: SocketResponder?; init() {}; init(_ o: SocketResponder) { object = o } }
+
 private func testSocketPath() -> String {
     "/tmp/pp-\(UUID().uuidString.prefix(8).lowercased()).sock"
 }
@@ -184,6 +186,26 @@ private func sendLine(_ fd: Int32, _ line: Data) {
         try await Task.sleep(for: .milliseconds(100))
         #expect(closes.value == 1)
         #expect(responder.value?.outcome == .peerClosed)
+    }
+
+    @Test func onCloseIsReleasedAfterFiring() async throws {
+        let path = testSocketPath()
+        let weakRef = Box<WeakResponder>(WeakResponder())
+        let fired = Box(false)
+        let server = SocketServer(path: path) { _, r in
+            // The closure captures the responder strongly, forming a cycle unless onClose is cleared.
+            r.onClose = { fired.value = true; _ = r.id }
+            weakRef.value = WeakResponder(r)
+        }
+        try server.start()
+        defer { server.stop(); unlink(path) }
+
+        let fd = try rawClient(path)
+        sendLine(fd, try requestLine())
+        #expect(await eventually { weakRef.value.object != nil })
+        close(fd)
+        #expect(await eventually { fired.value })
+        #expect(await eventually { weakRef.value.object == nil })
     }
 
     @Test func rejectsOversizeLine() async throws {
