@@ -86,16 +86,17 @@ struct CardView: View {
         }
     }
 
+    /// Every "all projects" rule is always listed; only the others collapse into a count.
     private var rules: some View {
-        let all = summary.alwaysAllowRules
+        let shown = summary.displayedRules(limit: Self.maxRulesShown)
         return VStack(alignment: .leading, spacing: 2) {
-            ForEach(Array(all.prefix(Self.maxRulesShown).enumerated()), id: \.offset) { item in
+            ForEach(Array(shown.lines.enumerated()), id: \.offset) { item in
                 Text("Always allow: \(item.element)")
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
-            if all.count > Self.maxRulesShown {
-                Text("and \(all.count - Self.maxRulesShown) more rules")
+            if shown.hidden > 0 {
+                Text(shown.hidden == 1 ? "and 1 more rule" : "and \(shown.hidden) more rules")
             }
         }
         .font(.caption)

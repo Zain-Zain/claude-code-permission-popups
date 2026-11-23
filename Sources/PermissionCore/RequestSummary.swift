@@ -1,11 +1,21 @@
 import Foundation
 
+/// One rule Always Allow would save, as shown on the card.
+public struct AlwaysAllowRule: Equatable, Sendable {
+    /// For example "Bash(npm install:*) — this project".
+    public let text: String
+    /// Saved to `userSettings`, so it applies in every project.
+    public let isUserWide: Bool
+}
+
 public struct RequestSummary: Equatable, Sendable {
     public let headline: String
     public let primary: String?
     public let detail: String?
     public let cwd: String?
-    public let alwaysAllowRules: [String]
+    public let rules: [AlwaysAllowRule]
+
+    public var alwaysAllowRules: [String] { rules.map(\.text) }
 
     public static let maxPrimaryLength = 2000
     static let maxEditSideLength = 200  // including the ellipsis
@@ -30,7 +40,7 @@ public struct RequestSummary: Equatable, Sendable {
             primary = str("file_path").map(cap)
             let first = r.toolName == "MultiEdit" ? input["edits"]?.arrayValue?.first : input
             if let old = first?["old_string"]?.stringValue, let new = first?["new_string"]?.stringValue {
-                detail = "− \(Self.capped(old, limit: Self.maxEditSideLength - 1))\n+ \(Self.capped(new, limit: Self.maxEditSideLength - 1))"
+                detail = "− \(Self.clipped(old, limit: Self.maxEditSideLength - 1))\n+ \(Self.clipped(new, limit: Self.maxEditSideLength - 1))"
             }
         case "Write":
             headline = "Claude wants to create a file"
@@ -62,17 +72,45 @@ public struct RequestSummary: Equatable, Sendable {
             } else {
                 headline = "Claude wants to use \(r.toolName)"
             }
-            primary = input.compactString(maxLength: Self.maxPrimaryLength)
+            primary = cap(input.compactString(maxLength: .max))
         }
 
         self.headline = headline
         self.primary = primary
         self.detail = detail
         self.cwd = r.cwd.map { Self.abbreviate($0, home: homeDirectory) }
-        self.alwaysAllowRules = Self.displayRules(alwaysAllowUpdates(from: r.permissionSuggestions))
+        self.rules = Self.displayRules(alwaysAllowUpdates(from: r.permissionSuggestions))
     }
 
+    /// The rules to list on a card, in order: every user-wide ("all projects") rule, plus the
+    /// others while the total stays within `limit`. `hidden` counts the others left out.
+    public func displayedRules(limit: Int) -> (lines: [String], hidden: Int) {
+        var budget = max(0, limit - rules.filter(\.isUserWide).count)
+        var lines: [String] = []
+        var hidden = 0
+        for rule in rules {
+            if rule.isUserWide {
+                lines.append(rule.text)
+            } else if budget > 0 {
+                lines.append(rule.text)
+                budget -= 1
+            } else {
+                hidden += 1
+            }
+        }
+        return (lines, hidden)
+    }
+
+    /// `primary` text over `limit` characters is cut, with an ellipsis and a line saying
+    /// exactly how many characters are hidden (a harmless head must not hide a dangerous tail).
     static func capped(_ s: String, limit: Int = RequestSummary.maxPrimaryLength) -> String {
+        let total = s.count
+        guard total > limit else { return s }
+        return String(s.prefix(limit)) + "…\n(\(total - limit) more characters not shown)"
+    }
+
+    /// Short single-line cut for the edit preview, which is never the thing being approved alone.
+    static func clipped(_ s: String, limit: Int) -> String {
         guard s.count > limit else { return s }
         return String(s.prefix(limit)) + "…"
     }
@@ -93,13 +131,15 @@ public struct RequestSummary: Equatable, Sendable {
         }
     }
 
-    static func displayRules(_ updates: [JSONValue]) -> [String] {
-        updates.flatMap { u -> [String] in
-            let suffix = destinationLabel(u["destination"]?.stringValue).map { " — \($0)" } ?? ""
+    static func displayRules(_ updates: [JSONValue]) -> [AlwaysAllowRule] {
+        updates.flatMap { u -> [AlwaysAllowRule] in
+            let destination = u["destination"]?.stringValue
+            let suffix = destinationLabel(destination).map { " — \($0)" } ?? ""
             return (u["rules"]?.arrayValue ?? []).compactMap { rule in
                 guard let tool = rule["toolName"]?.stringValue else { return nil }
                 let content = rule["ruleContent"]?.stringValue.flatMap { $0.isEmpty ? nil : $0 }
-                return (content.map { "\(tool)(\($0))" } ?? tool) + suffix
+                return AlwaysAllowRule(text: (content.map { "\(tool)(\($0))" } ?? tool) + suffix,
+                                       isUserWide: destination == "userSettings")
             }
         }
     }

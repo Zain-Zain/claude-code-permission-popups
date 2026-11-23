@@ -25,6 +25,18 @@ func fixture(_ name: String) throws -> Data {
         #expect(q.toolInput["questions"]?.arrayValue?.count == 1)
     }
 
+    /// The hooks reference sends `mcp_server` as `{name, source}`; a bare string is still accepted.
+    @Test func decodesMCPServerShapes() throws {
+        func server(_ raw: String) throws -> String? {
+            let d = Data(#"{"hook_event_name":"PermissionRequest","tool_name":"mcp__gh__x","mcp_server":\#(raw)}"#.utf8)
+            return try PermissionRequest(json: d).mcpServer
+        }
+        #expect(try server(#"{"name":"github","source":"user"}"#) == "github")
+        #expect(try server(#""github""#) == "github")
+        #expect(try server(#"{"source":"user"}"#) == nil)
+        #expect(try server("5") == nil)
+    }
+
     @Test func rejectsWrongEvent() {
         let d = Data(#"{"hook_event_name":"PreToolUse","tool_name":"Bash"}"#.utf8)
         #expect(throws: (any Error).self) { try PermissionRequest(json: d) }

@@ -31,7 +31,8 @@ public struct PermissionRequest: Equatable, Sendable {
         } else {
             self.toolInput = .object([:])
         }
-        self.mcpServer = raw["mcp_server"]?.stringValue
+        // The hooks reference sends `{name, source}`; a bare string is accepted too.
+        self.mcpServer = raw["mcp_server"]?["name"]?.stringValue ?? raw["mcp_server"]?.stringValue
         self.permissionSuggestions = raw["permission_suggestions"]?.arrayValue ?? []
     }
 }
