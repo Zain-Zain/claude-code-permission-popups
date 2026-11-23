@@ -1,22 +1,20 @@
-# claude code permission popups
+claude code permission popups (MACOS)
 
 made cus i was bored. it's a little menu bar app that shows claude code's permission requests as a floating card over whatever app you're in, so you don't have to keep switching back to claude.
 
 you get allow, deny and always allow. the card won't steal your focus, so you can keep typing.
 
-## install
+install
 
 you need a mac and swift 
 
-```sh
-make install
-```
+make install #
 
 then click the shield in the menu bar and install
 
-## using it
+using it
 
-- click **Allow**, **Deny** or **Always Allow** on the card
+- click allow/deny/always allow
 - or click the card and press return / escape
 - or from anywhere: ctrl+option+return to allow, ctrl+option+escape to deny
 
@@ -28,22 +26,12 @@ the menu bar icon has the rest: turn popups on/off, move the cards to another co
 
 uninstall the hook from the menu, then:
 
-```sh
 make uninstall
-```
 
-## dev stuff
-
-```sh
 make build
 make test
 make app
-```
 
-how it works under the hood is in [docs/architecture.md](docs/architecture.md).
 
-## credits
-
-me (and claude)
-
-MIT license
+credits
+me (and CLAUDE)
