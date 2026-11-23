@@ -107,12 +107,15 @@ struct CardView: View {
         // Always Allow deliberately has no shortcut at all.
         HStack(spacing: 8) {
             Button(action: onDeny) { Text("Deny ⎋") }
+                .focusable(false)
             Spacer(minLength: 0)
             if canAlwaysAllow {
                 Button(action: onAlwaysAllow) { Text("Always Allow") }
+                    .focusable(false)
             }
             Button(action: onAllow) { Text("Allow ↩") }
                 .buttonStyle(AllowButtonStyle())
+                .focusable(false)
         }
         .padding(.top, 2)
     }

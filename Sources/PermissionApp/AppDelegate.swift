@@ -12,7 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let queue = RequestQueue()
     let history = HistoryStore(fileURL: AppPaths.historyURL)
     private(set) var panels: PanelController?
-    // The status bar menu (Task 9) is created alongside the panels in applicationDidFinishLaunching.
+    private var statusMenu: StatusMenu?
 
     private var server: SocketServer?
     private var hotKeys: HotKeys?
@@ -43,6 +43,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panels = PanelController(queue: queue, prefs: prefs) { [weak self] id, decision in
             self?.decide(id: id, decision: decision)
         }
+
+        statusMenu = StatusMenu(prefs: prefs, queue: queue, panels: panels, historyStore: history)
+
+        statusMenu = StatusMenu(prefs: prefs, queue: queue, panels: panels, historyStore: history)
 
         let server = SocketServer(path: AppPaths.socketPath) { [weak self] wire, responder in
             self?.handle(wire, responder: responder)

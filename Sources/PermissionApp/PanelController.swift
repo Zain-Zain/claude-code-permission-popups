@@ -106,6 +106,9 @@ final class PanelController {
         log("layout: pending=\(pending.count) visible=\(frames.count) overflow=\(overflow)")
     }
 
+    /// Lays the cards out again now (for example after the corner changed).
+    func reflow() { relayout() }
+
     private func relayout() {
         update(queue.pending)
     }
@@ -199,6 +202,7 @@ final class PanelController {
         let panel = card.panel
         panel.onAllow = nil
         panel.onDeny = nil
+        panel.markDismissed()
         panel.ignoresMouseEvents = true
         NSAnimationContext.runAnimationGroup { context in
             context.duration = Self.fadeDuration

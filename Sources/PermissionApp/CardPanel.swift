@@ -34,7 +34,16 @@ final class CardPanel: NSPanel {
     }
 
     /// True so a click can make the card key without activating the app.
-    override var canBecomeKey: Bool { keyable }
+    override var canBecomeKey: Bool { keyable && !dismissed }
+
+    private var dismissed = false
+
+    /// Called when the card starts fading out: it must stop taking keystrokes at once, so a
+    /// key card that is being dismissed gives up key status and can never become key again.
+    func markDismissed() {
+        dismissed = true
+        if isKeyWindow { resignKey() }
+    }
     override var canBecomeMain: Bool { false }
 
     /// Return/Enter and Escape are taken here, before any view (such as the selectable
@@ -49,6 +58,8 @@ final class CardPanel: NSPanel {
         let blocking: NSEvent.ModifierFlags = [.command, .control, .option]
         guard event.modifierFlags.intersection(blocking).isEmpty else { return false }
         switch event.keyCode {
+        case 48, 49: // Tab and Space: Full Keyboard Access must not be able to press Always Allow
+            return true
         case 36, 76: // Return, keypad Enter
             if !event.isARepeat { onAllow?() }
             return true
