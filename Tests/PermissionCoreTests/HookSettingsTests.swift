@@ -25,7 +25,7 @@ private func permissionRequestEntries(_ root: JSONValue) -> [JSONValue] {
             "matcher": .string("*"),
             "hooks": .array([.object([
                 "type": .string("command"),
-                "command": .string(helper),
+                "command": .string(HookSettings.shellQuoted(helper)),
                 "timeout": .number(600),
             ])]),
         ]))
@@ -246,5 +246,76 @@ private func permissionRequestEntries(_ root: JSONValue) -> [JSONValue] {
         let v = JSONValue.array([.number(600), .number(0), .number(-3), .number(1.5), .number(9_007_199_254_740_992)])
         let text = String(data: try enc.encode(v), encoding: .utf8)!
         #expect(text == "[600,0,-3,1.5,9007199254740992]")
+    }
+
+    // MARK: Quoting
+
+    @Test func shellQuotedFormat() {
+        #expect(HookSettings.shellQuoted("/a b/c") == "'/a b/c'")
+        #expect(HookSettings.shellQuoted("/it's/c") == #"'/it'\''s/c'"#)
+    }
+
+    @Test func quotedCommandRunsThroughShell() throws {
+        let base = FileManager.default.temporaryDirectory
+            .appendingPathComponent("hook test \(UUID().uuidString)/Permission Popups.app")
+        try FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: base.deletingLastPathComponent()) }
+        let script = base.appendingPathComponent("permission-hook")
+        try "#!/bin/sh\necho ok\n".write(to: script, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: script.path)
+
+        let command = try #require(HookSettings.entry(helperPath: script.path)["hooks"]?.arrayValue?[0]["command"]?.stringValue)
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/bin/sh")
+        p.arguments = ["-c", command]
+        let pipe = Pipe()
+        p.standardOutput = pipe
+        try p.run()
+        let out = pipe.fileHandleForReading.readDataToEndOfFile()
+        p.waitUntilExit()
+        #expect(String(decoding: out, as: UTF8.self) == "ok\n")
+    }
+
+    @Test func quotedPathWithApostropheIsRecognised() throws {
+        let path = "/Users/o'brien/Permission Popups.app/Contents/MacOS/permission-hook"
+        let out = try HookSettings.install(into: nil, helperPath: path)
+        #expect(HookSettings.status(of: out, helperPath: path) == .installed)
+        #expect(HookSettings.status(of: out, helperPath: helper) == .installedAtOtherPath(path))
+        let removed = try parse(HookSettings.uninstall(from: out, helperPath: path))
+        #expect(removed == .object([:]))
+        // Re-install at a new path replaces rather than duplicates.
+        let moved = try parse(HookSettings.install(into: out, helperPath: helper))
+        #expect(permissionRequestEntries(moved) == [HookSettings.entry(helperPath: helper)])
+    }
+
+    @Test func statusAcceptsLegacyUnquotedCommand() throws {
+        let legacy = data(#"{"hooks":{"PermissionRequest":[{"matcher":"*","hooks":[{"type":"command","command":"\#(helper)","timeout":600}]}]}}"#)
+        #expect(HookSettings.status(of: legacy, helperPath: helper) == .installed)
+        let quoted = try HookSettings.install(into: legacy, helperPath: helper)
+        #expect(permissionRequestEntries(try parse(quoted)) == [HookSettings.entry(helperPath: helper)])
+    }
+
+    // MARK: Number fidelity
+
+    @Test func refusesUnrepresentableInteger() {
+        for fn in [{ try HookSettings.install(into: data(#"{"n":9007199254740993}"#), helperPath: helper) },
+                   { try HookSettings.uninstall(from: data(#"{"n":9007199254740993}"#), helperPath: helper) }] {
+            do { _ = try fn(); Issue.record("expected throw") }
+            catch HookSettingsError.unexpectedShape(let m) { #expect(m == "number cannot be preserved exactly") }
+            catch { Issue.record("wrong error \(error)") }
+        }
+    }
+
+    @Test func refusesHugeInteger() {
+        #expect(throws: HookSettingsError.unexpectedShape("number cannot be preserved exactly")) {
+            try HookSettings.install(into: data(#"{"a":[1,{"n":12345678901234567890}]}"#), helperPath: helper)
+        }
+    }
+
+    @Test func acceptsOrdinaryNumbers() throws {
+        let existing = data(#"{"a":[600,0.5,1e-7,-3,9007199254740992,0.1],"s":"9007199254740993 \"12345678901234567890\""}"#)
+        let out = try parse(HookSettings.install(into: existing, helperPath: helper))
+        #expect(out["a"] == .array([.number(600), .number(0.5), .number(1e-7), .number(-3), .number(9007199254740992), .number(0.1)]))
+        #expect(out["s"] == .string(#"9007199254740993 "12345678901234567890""#))
     }
 }
