@@ -51,4 +51,11 @@ func fixture(_ name: String) throws -> Data {
         #expect(v.compactString(maxLength: 100) == #"{"a":"x","b":1}"#)
         #expect(v.compactString(maxLength: 5).count <= 5)
     }
+
+    @Test func normalizesNonObjectToolInput() throws {
+        for bad in [#""x""#, "[1]", "null", "5"] {
+            let d = Data(#"{"hook_event_name":"PermissionRequest","tool_name":"Bash","tool_input":\#(bad)}"#.utf8)
+            #expect(try PermissionRequest(json: d).toolInput == .object([:]))
+        }
+    }
 }

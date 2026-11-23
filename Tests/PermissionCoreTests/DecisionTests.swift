@@ -54,4 +54,8 @@ private func decisionObject(_ d: Decision) throws -> JSONValue {
         }
         #expect(WireReply(v: 1, decision: "bogus", updatedPermissions: nil, message: nil).toDecision() == nil)
     }
+
+    @Test func allowAlwaysWithoutUpdatesIsInvalid() {
+        #expect(WireReply(v: 1, decision: "allow_always", updatedPermissions: nil, message: nil).toDecision() == nil)
+    }
 }

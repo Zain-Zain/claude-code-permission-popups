@@ -26,7 +26,11 @@ public struct PermissionRequest: Equatable, Sendable {
         self.sessionId = raw["session_id"]?.stringValue ?? ""
         self.cwd = raw["cwd"]?.stringValue
         self.permissionMode = raw["permission_mode"]?.stringValue
-        self.toolInput = raw["tool_input"] ?? .object([:])
+        if let input = raw["tool_input"], input.objectValue != nil {
+            self.toolInput = input
+        } else {
+            self.toolInput = .object([:])
+        }
         self.mcpServer = raw["mcp_server"]?.stringValue
         self.permissionSuggestions = raw["permission_suggestions"]?.arrayValue ?? []
     }

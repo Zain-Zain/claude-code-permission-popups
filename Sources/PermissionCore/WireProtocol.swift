@@ -39,7 +39,9 @@ public struct WireReply: Codable, Equatable {
     public func toDecision() -> Decision? {
         switch decision {
         case "allow": return .allow
-        case "allow_always": return .allowAlways(updatedPermissions: updatedPermissions ?? [])
+        case "allow_always":
+            guard let updates = updatedPermissions else { return nil }
+            return .allowAlways(updatedPermissions: updates)
         case "deny": return .deny(message: message ?? denyMessage)
         case "pass": return .pass
         default: return nil
