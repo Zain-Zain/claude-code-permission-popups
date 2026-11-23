@@ -99,6 +99,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Requests
 
     private func handle(_ wire: WireRequest, responder: SocketResponder) {
+        guard wire.isSupportedVersion else {
+            log("request: wire version \(wire.v) unsupported, passing")
+            responder.reply(WireReply(.pass))
+            return
+        }
         guard let json = try? JSONEncoder().encode(wire.request),
               let request = try? PermissionRequest(json: json) else {
             log("request: unreadable, passing")

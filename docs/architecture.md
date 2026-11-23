@@ -56,7 +56,7 @@ Newline-delimited JSON over `~/Library/Application Support/local.permission-popu
   - `{"v":1,"decision":"deny","message":"..."}`
   - `{"v":1,"decision":"pass"}`
 
-The helper maps the reply to Claude Code's output format, so knowledge of that schema lives in one tested place. `pass`, an unknown decision, or an `allow_always` without `updatedPermissions` produce no output.
+The helper maps the reply to Claude Code's output format, so knowledge of that schema lives in one tested place. `pass`, an unknown decision, a version other than 1, or an `allow_always` without any offered `addRules`/`allow` entry produce no output.
 
 ## Request lifecycle
 
@@ -80,7 +80,10 @@ This is a deliberate deviation from the design (§5.4 lists `ExitPlanMode` as a 
 - **No focus stealing.** Cards are non-activating panels shown with `orderFrontRegardless()`. A card becomes key only when clicked. Hover does not focus it.
 - **Deny rules always win.** According to the Claude Code hooks reference, a PermissionRequest hook cannot approve something a deny rule refuses, so Claude Code's configured rules still apply.
 - **Always Allow filtering.** Only `addRules` suggestions with `behavior: "allow"` are forwarded, all together, since a compound command can produce several rules. `setMode`, `addDirectories`, `replaceRules` and anything else are dropped because each grants more than "this kind of action". If nothing is left the button is hidden. The card lists the rules and destinations first. Claude Code writes the rules itself; this app never edits permission rules.
-- **Socket override.** `PERMISSION_POPUPS_SOCKET` only changes where the helper connects. The app still enforces the peer UID, and an unreachable socket results in a silent pass.
+- **Server check in the helper.** After connecting, the helper calls `getpeereid` and treats a server owned by another user as no server (a silent pass), before sending anything.
+- **The helper enforces Always Allow itself.** It re-filters the app's `updatedPermissions` to `addRules`/`allow` entries that equal an entry Claude Code offered in this request, and prints nothing if none are left. Neither a buggy app nor another socket server can make it grant a mode change or an unoffered rule.
+- **Wire version.** Both sides accept only `"v":1`. The app answers any other version with `pass`, and the helper prints nothing for a reply with any other version.
+- **Socket override.** `PERMISSION_POPUPS_SOCKET` is honoured only by debug builds of the helper (tests and the integration script). Release builds always use the support-directory socket.
 - **No HTTP hook.** A localhost HTTP server could be reached by any local process or web page, which could post fake requests and flood the screen with cards. A Unix socket restricted to the user's account, with a peer UID check, avoids that.
 - **No network.** The app opens no network connections. History stays on disk (mode 0600, latest 1,000 entries).
 - **settings.json edits** show the exact change first, refuse invalid or unexpected content (writing nothing), keep a timestamped backup, follow symlinks, re-read after confirmation, and preserve file permissions.

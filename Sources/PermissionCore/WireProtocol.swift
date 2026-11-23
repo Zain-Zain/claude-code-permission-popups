@@ -1,13 +1,18 @@
 import Foundation
 
+/// The only wire version either side accepts. Anything else is answered or treated as `pass`.
+public let wireProtocolVersion = 1
+
 public struct WireRequest: Codable {
     public let v: Int
     public let request: JSONValue
 
-    public init(v: Int = 1, request: JSONValue) {
+    public init(v: Int = wireProtocolVersion, request: JSONValue) {
         self.v = v
         self.request = request
     }
+
+    public var isSupportedVersion: Bool { v == wireProtocolVersion }
 }
 
 public struct WireReply: Codable, Equatable {
@@ -26,17 +31,19 @@ public struct WireReply: Codable, Equatable {
     public init(_ d: Decision) {
         switch d {
         case .allow:
-            self.init(v: 1, decision: "allow", updatedPermissions: nil, message: nil)
+            self.init(v: wireProtocolVersion, decision: "allow", updatedPermissions: nil, message: nil)
         case .allowAlways(let u):
-            self.init(v: 1, decision: "allow_always", updatedPermissions: u, message: nil)
+            self.init(v: wireProtocolVersion, decision: "allow_always", updatedPermissions: u, message: nil)
         case .deny(let m):
-            self.init(v: 1, decision: "deny", updatedPermissions: nil, message: m)
+            self.init(v: wireProtocolVersion, decision: "deny", updatedPermissions: nil, message: m)
         case .pass:
-            self.init(v: 1, decision: "pass", updatedPermissions: nil, message: nil)
+            self.init(v: wireProtocolVersion, decision: "pass", updatedPermissions: nil, message: nil)
         }
     }
 
+    /// The decision, or nil for an unknown version or decision (the helper then prints nothing).
     public func toDecision() -> Decision? {
+        guard v == wireProtocolVersion else { return nil }
         switch decision {
         case "allow": return .allow
         case "allow_always":

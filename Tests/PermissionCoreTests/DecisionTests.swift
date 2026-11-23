@@ -55,6 +55,21 @@ private func decisionObject(_ d: Decision) throws -> JSONValue {
         #expect(WireReply(v: 1, decision: "bogus", updatedPermissions: nil, message: nil).toDecision() == nil)
     }
 
+    @Test func replyWithOtherVersionIsInvalid() {
+        for v in [0, 2] {
+            #expect(WireReply(v: v, decision: "allow", updatedPermissions: nil, message: nil).toDecision() == nil)
+            #expect(WireReply(v: v, decision: "deny", updatedPermissions: nil, message: "x").toDecision() == nil)
+        }
+    }
+
+    @Test func requestVersionCheck() throws {
+        let current = try JSONDecoder().decode(WireRequest.self, from: Data(#"{"v":1,"request":{}}"#.utf8))
+        #expect(current.isSupportedVersion)
+        let future = try JSONDecoder().decode(WireRequest.self, from: Data(#"{"v":2,"request":{}}"#.utf8))
+        #expect(!future.isSupportedVersion)
+        #expect(WireRequest(request: .object([:])).isSupportedVersion)
+    }
+
     @Test func allowAlwaysWithoutUpdatesIsInvalid() {
         #expect(WireReply(v: 1, decision: "allow_always", updatedPermissions: nil, message: nil).toDecision() == nil)
     }

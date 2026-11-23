@@ -59,12 +59,54 @@ private func serve(_ path: String, reply: WireReply, counter: Counter = Counter(
 
     @Test func allowAlwaysFlowsThrough() async throws {
         let path = socketPath()
-        let updates: [JSONValue] = [.object(["type": .string("addRules"), "behavior": .string("allow")])]
+        let updates = [try PermissionRequest(json: fixture("bash")).permissionSuggestions[0]]
         let server = try serve(path, reply: WireReply(.allowAlways(updatedPermissions: updates)))
         defer { server.stop() }
         let out = await runInBackground(try fixture("bash"), path)
         #expect(parsed(out) != nil)
         #expect(parsed(out) == parsed(ClaudeHookOutput.encode(.allowAlways(updatedPermissions: updates))))
+    }
+
+    /// The helper enforces the Always Allow filter itself, whatever the app sends.
+    @Test func helperRejectsSetModeFromApp() async throws {
+        let path = socketPath()
+        let setMode = JSONValue.object([
+            "type": .string("setMode"), "mode": .string("bypassPermissions"), "destination": .string("userSettings"),
+        ])
+        let server = try serve(path, reply: WireReply(.allowAlways(updatedPermissions: [setMode])))
+        defer { server.stop() }
+        #expect(await runInBackground(try fixture("bash"), path) == nil)
+    }
+
+    /// Even an addRules/allow entry is refused unless Claude Code offered exactly that entry.
+    @Test func helperRejectsUnsuggestedRule() async throws {
+        let path = socketPath()
+        let unsuggested = JSONValue.object([
+            "type": .string("addRules"), "behavior": .string("allow"), "destination": .string("userSettings"),
+            "rules": .array([.object(["toolName": .string("Bash")])]),
+        ])
+        let server = try serve(path, reply: WireReply(.allowAlways(updatedPermissions: [unsuggested])))
+        defer { server.stop() }
+        #expect(await runInBackground(try fixture("bash"), path) == nil)
+    }
+
+    /// A mix of offered and other entries forwards only the offered addRules/allow ones.
+    @Test func helperForwardsOnlyOfferedRules() async throws {
+        let path = socketPath()
+        let suggestions = try PermissionRequest(json: fixture("bash")).permissionSuggestions
+        let extra = JSONValue.object(["type": .string("addRules"), "behavior": .string("allow")])
+        let server = try serve(path, reply: WireReply(.allowAlways(updatedPermissions: [extra] + suggestions)))
+        defer { server.stop() }
+        let out = await runInBackground(try fixture("bash"), path)
+        #expect(parsed(out) != nil)
+        #expect(parsed(out) == parsed(ClaudeHookOutput.encode(.allowAlways(updatedPermissions: [suggestions[0]]))))
+    }
+
+    @Test func helperIgnoresOtherWireVersion() async throws {
+        let path = socketPath()
+        let server = try serve(path, reply: WireReply(v: 2, decision: "allow", updatedPermissions: nil, message: nil))
+        defer { server.stop() }
+        #expect(await runInBackground(try fixture("bash"), path) == nil)
     }
 
     @Test func passPrintsNothing() async throws {

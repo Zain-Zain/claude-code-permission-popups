@@ -114,7 +114,7 @@ Layout:
 - `Tests/PermissionCoreTests`: unit tests (Swift Testing). `scripts/integration-test.sh` runs the real helper with no app listening.
 - `Resources/Info.plist`: bundle metadata (`LSUIElement`, so no Dock icon).
 
-The helper accepts a `PERMISSION_POPUPS_SOCKET` environment variable that overrides the socket path. The integration test uses it. It is available in release builds too.
+Debug builds of the helper (`swift build`, as used by the integration test) accept a `PERMISSION_POPUPS_SOCKET` environment variable that overrides the socket path. Release builds, including the app bundle, ignore it and always use the socket in the support directory. Either way the helper checks that the server runs as the same user and stays silent otherwise.
 
 There are no third-party dependencies. See [docs/architecture.md](docs/architecture.md) for how the pieces fit together.
 

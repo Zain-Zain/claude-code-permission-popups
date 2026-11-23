@@ -12,9 +12,15 @@ public enum SocketClient {
     /// `.pathTooLong` for an unusable path, and `.closed` when the connection ends or
     /// fails before a full line arrives. The write side is never shut down early, because
     /// the server treats EOF from the helper as "the request was withdrawn".
-    public static func exchange(path: String, line: Data) throws -> Data {
+    ///
+    /// The server must run as `serverUID` (this user by default); a server owned by anyone
+    /// else is treated as no server at all (`.connectFailed`), before anything is sent.
+    public static func exchange(path: String, line: Data, serverUID: uid_t = getuid()) throws -> Data {
         let fd = try UnixSocket.connect(path: path)
         defer { close(fd) }
+        var uid = uid_t.max
+        var gid = gid_t.max
+        guard getpeereid(fd, &uid, &gid) == 0, uid == serverUID else { throw SocketError.connectFailed }
 
         var out = line
         out.append(0x0A)

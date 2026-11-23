@@ -108,6 +108,20 @@ private func sendLine(_ fd: Int32, _ line: Data) {
         #expect(ContinuousClock.now - start < .milliseconds(100))
     }
 
+    /// The helper only trusts a server running as its own user.
+    @Test func clientRejectsServerWithOtherUID() async throws {
+        let path = testSocketPath()
+        let server = SocketServer(path: path) { _, responder in responder.reply(WireReply(.allow)) }
+        try server.start()
+        defer { server.stop() }
+        #expect(throws: SocketError.connectFailed) {
+            try SocketClient.exchange(path: path, line: try requestLine(), serverUID: getuid() &+ 1)
+        }
+        // The same server is accepted when it runs as the expected user.
+        let result = await exchangeInBackground(path: path, line: try requestLine())
+        #expect(try JSONDecoder().decode(WireReply.self, from: try result.get()).decision == "allow")
+    }
+
     @Test func staleSocketIsReplaced() async throws {
         let path = testSocketPath()
         FileManager.default.createFile(atPath: path, contents: Data("junk".utf8))
