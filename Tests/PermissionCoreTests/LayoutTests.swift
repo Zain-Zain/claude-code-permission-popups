@@ -61,6 +61,31 @@ private let vf = CGRect(x: 0, y: 25, width: 1440, height: 875)
         #expect(PanelLayout.frames(heights: [], corner: .topLeft, visibleFrame: vf).isEmpty)
     }
 
+    @Test func pillRightCornerX() {
+        let last = CGRect(x: 1440 - 16 - 360, y: 41, width: 360, height: 120)
+        let pill = PanelLayout.overflowPillFrame(afterLast: last, corner: .bottomRight)
+        #expect(pill.minX == last.minX)
+        #expect(pill.width == 360)
+    }
+
+    @Test func visibleCountFitsAll() {
+        #expect(PanelLayout.visibleCount(heights: [120, 120, 120], visibleFrame: vf) == 3)
+    }
+
+    @Test func visibleCountLimitsTallStack() {
+        // Available = 875 - 2*16 = 843. Two cards: 300+8+300 = 608, plus pill space
+        // (gap 8 + pillHeight 28 = 36) = 644 <= 843. Three cards: 900+16 = 916 > 843.
+        #expect(PanelLayout.visibleCount(heights: [300, 300, 300, 300], visibleFrame: vf) == 2)
+    }
+
+    @Test func visibleCountAlwaysShowsOldest() {
+        #expect(PanelLayout.visibleCount(heights: [2000], visibleFrame: vf) == 1)
+    }
+
+    @Test func visibleCountEmpty() {
+        #expect(PanelLayout.visibleCount(heights: [], visibleFrame: vf) == 0)
+    }
+
     @Test func cornerTitles() {
         #expect(Corner.bottomLeft.title == "Bottom Left")
         #expect(Corner.bottomRight.title == "Bottom Right")

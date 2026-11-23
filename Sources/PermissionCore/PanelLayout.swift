@@ -21,8 +21,28 @@ public enum PanelLayout {
     public static let pillHeight: CGFloat = 28
     public static let maxVisible = 4
 
-    /// Frames for the first `maxVisible` heights, oldest first. The oldest card
-    /// sits nearest the corner; later cards stack away from it.
+    /// How many of the leading heights (capped at `maxVisible`) fit vertically inside
+    /// `visibleFrame`, leaving room for the overflow pill when some heights are not shown.
+    /// Returns 0 for empty input, otherwise at least 1, so the oldest card is always shown.
+    public static func visibleCount(heights: [CGFloat], visibleFrame: CGRect) -> Int {
+        guard !heights.isEmpty else { return 0 }
+        let available = visibleFrame.height - 2 * margin
+        var best = 1
+        var used: CGFloat = 0
+        for k in 1...min(maxVisible, heights.count) {
+            used += heights[k - 1] + (k > 1 ? gap : 0)
+            let pillSpace = k < heights.count ? gap + pillHeight : 0
+            if used + pillSpace <= available {
+                best = k
+            }
+        }
+        return best
+    }
+
+    /// Lays out exactly the heights given, oldest first, up to `maxVisible`. The oldest
+    /// card sits nearest the corner; later cards stack away from it. This does not clamp
+    /// to the screen: callers pass `heights.prefix(visibleCount(...))` to keep the stack
+    /// inside `visibleFrame`.
     public static func frames(heights: [CGFloat], corner: Corner, visibleFrame: CGRect) -> [CGRect] {
         let isLeft = corner == .bottomLeft || corner == .topLeft
         let isBottom = corner == .bottomLeft || corner == .bottomRight
