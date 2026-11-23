@@ -76,6 +76,18 @@ import Testing
         #expect(store.load().map(\.headline) == ["h2", "h1"])
     }
 
+    @Test func appendAfterPartialLastLineKeepsBothEntries() throws {
+        let url = tempURL()
+        let store = HistoryStore(fileURL: url)
+        try store.append(entry(1))
+        let h = try FileHandle(forWritingTo: url)
+        try h.seekToEnd()
+        try h.write(contentsOf: Data(#"{"id":"abc","hea"#.utf8))
+        try h.close()
+        try store.append(entry(2))
+        #expect(store.load().map(\.headline) == ["h2", "h1"])
+    }
+
     @Test func clearEmpties() throws {
         let store = HistoryStore(fileURL: tempURL())
         try store.append(entry(1))

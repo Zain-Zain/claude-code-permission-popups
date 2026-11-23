@@ -74,9 +74,15 @@ public final class HistoryStore {
             }
         }
         try Self.ensureMode0600(fileURL)
-        let handle = try FileHandle(forWritingTo: fileURL)
+        let handle = try FileHandle(forUpdating: fileURL)
         defer { try? handle.close() }
-        try handle.seekToEnd()
+        let size = try handle.seekToEnd()
+        if size > 0 {
+            // A crash mid-append can leave a partial last line; start on a fresh line.
+            try handle.seek(toOffset: size - 1)
+            if try handle.read(upToCount: 1)?.first != 0x0A { line.insert(0x0A, at: 0) }
+            try handle.seekToEnd()
+        }
         try handle.write(contentsOf: line)
     }
 
