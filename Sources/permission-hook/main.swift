@@ -9,8 +9,9 @@ for sig in [SIGTERM, SIGINT, SIGHUP] {
 signal(SIGPIPE, SIG_IGN)
 
 let socketPath = ProcessInfo.processInfo.environment["PERMISSION_POPUPS_SOCKET"] ?? AppPaths.socketPath
-let input = FileHandle.standardInput.readDataToEndOfFile()
+let input = (try? FileHandle.standardInput.readToEnd()) ?? Data()
 if let output = HookRunner.run(stdin: input, socketPath: socketPath) {
-    FileHandle.standardOutput.write(output)
+    // The throwing API: the old write(_:) raises an uncatchable exception on I/O errors.
+    try? FileHandle.standardOutput.write(contentsOf: output)
 }
 exit(0)

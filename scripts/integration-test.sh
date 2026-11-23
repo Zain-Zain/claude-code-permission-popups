@@ -29,4 +29,19 @@ head -c 5242880 /dev/zero | tr '\0' 'a' | "$BIN" > "$OUT_FILE" || code=$?
 [ "$code" -eq 0 ] || fail "garbage input exit code $code"
 [ ! -s "$OUT_FILE" ] || fail "garbage input produced output"
 
+# Closed stdin: silent, exit 0, no exception trace on stderr.
+ERR_FILE=$(mktemp)
+code=0
+"$BIN" <&- > "$OUT_FILE" 2> "$ERR_FILE" || code=$?
+[ "$code" -eq 0 ] || fail "closed stdin exit code $code"
+[ ! -s "$OUT_FILE" ] || fail "closed stdin produced output"
+[ ! -s "$ERR_FILE" ] || fail "closed stdin wrote to stderr: $(cat "$ERR_FILE")"
+
+# Closed stdout: exit 0.
+code=0
+"$BIN" < Tests/PermissionCoreTests/Fixtures/bash.json >&- 2> "$ERR_FILE" || code=$?
+[ "$code" -eq 0 ] || fail "closed stdout exit code $code"
+[ ! -s "$ERR_FILE" ] || fail "closed stdout wrote to stderr: $(cat "$ERR_FILE")"
+rm -f "$ERR_FILE"
+
 echo OK
