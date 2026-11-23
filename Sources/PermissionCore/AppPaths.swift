@@ -6,7 +6,12 @@ public enum AppPaths {
     /// The home directory. `homeDirectoryForCurrentUser` ignores `HOME`, so `HOME` is
     /// honoured explicitly when it is a non-empty absolute path.
     public static var homeDirectory: URL {
-        if let home = ProcessInfo.processInfo.environment["HOME"], home.hasPrefix("/") {
+        homeDirectory(environment: ProcessInfo.processInfo.environment)
+    }
+
+    /// Pure form of `homeDirectory`, so the HOME handling can be tested without touching the process environment.
+    public static func homeDirectory(environment: [String: String]) -> URL {
+        if let home = environment["HOME"], home.hasPrefix("/") {
             return URL(fileURLWithPath: home, isDirectory: true)
         }
         return FileManager.default.homeDirectoryForCurrentUser

@@ -141,12 +141,10 @@ struct SettingsFileTests {
     }
 
     @Test func homeOverrideUsed() {
-        let old = getenv("HOME").map { String(cString: $0) }
-        defer { if let old { setenv("HOME", old, 1) } else { unsetenv("HOME") } }
-        setenv("HOME", "/tmp/pp-home-test", 1)
-        #expect(AppPaths.homeDirectory.path == "/tmp/pp-home-test")
-        #expect(AppPaths.supportDirectory.path.hasPrefix("/tmp/pp-home-test/Library/"))
-        setenv("HOME", "relative", 1)
-        #expect(AppPaths.homeDirectory == FileManager.default.homeDirectoryForCurrentUser)
+        let fallback = FileManager.default.homeDirectoryForCurrentUser
+        #expect(AppPaths.homeDirectory(environment: ["HOME": "/tmp/pp-home-test"]).path == "/tmp/pp-home-test")
+        #expect(AppPaths.homeDirectory(environment: ["HOME": ""]) == fallback)
+        #expect(AppPaths.homeDirectory(environment: ["HOME": "relative"]) == fallback)
+        #expect(AppPaths.homeDirectory(environment: [:]) == fallback)
     }
 }
