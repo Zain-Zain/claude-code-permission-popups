@@ -1,0 +1,10 @@
+.build/
+*.app
+dist/
+.DS_Store
+xcuserdata/
+.swiftpm/
+.env
+.env.*
+*.bak-*
+.superpowers/
