@@ -63,7 +63,7 @@ Keyboard:
 - Control-Option-Return allows and Control-Option-Escape denies the oldest card, from any app. These need no Accessibility permission.
 - Always Allow has no shortcut and cannot be reached with Tab or Space. It needs a click.
 
-Up to four cards are shown, oldest nearest the corner, with a "+N more" pill for the rest. A card is removed when it is answered or when Claude Code stops waiting for it (for example, you answered in Claude's own prompt).
+Up to four cards are shown, oldest nearest the corner, with a "+N more" pill for the rest. A card is removed when it is answered, or when the connection closes because the session ended or the hook timed out. Whether the card also disappears when you answer in Claude's own prompt is not verified; see [Verification results](docs/architecture.md#verification-results). If it stays, it clears at the hook timeout.
 
 According to the Claude Code hooks reference, in the desktop app and the VS Code extension the hook runs alongside Claude's own permission prompt, and whichever decides first applies.
 

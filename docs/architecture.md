@@ -69,7 +69,7 @@ The helper maps the reply to Claude Code's output format, so knowledge of that s
 
 If the host does not end the helper when you answer in Claude's own prompt, the card may stay until the hook timeout. What Claude Code does with a late answer is not documented and is listed under Verification results.
 
-According to the Claude Code hooks reference, PermissionRequest also fires where Claude Code would otherwise auto-deny because nobody can answer, so those requests get a card too. A hook that times out or exits without a decision leaves the normal permission flow unchanged. `AskUserQuestion` never reaches the app: the helper exits silently for it.
+According to the Claude Code hooks reference, PermissionRequest also fires where Claude Code would otherwise auto-deny because nobody can answer, so those requests get a card too. According to the same reference, a hook that times out or exits without a decision leaves the normal permission flow unchanged. `AskUserQuestion` never reaches the app: the helper exits silently for it.
 
 ## Security model
 
