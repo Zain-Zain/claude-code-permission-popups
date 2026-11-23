@@ -93,9 +93,16 @@ This is a deliberate deviation from the design (§5.4 lists `ExitPlanMode` as a 
 
 ## Verification results
 
-Items from the design's research section that documentation could not settle. To be filled in after the end-to-end test.
+Items from the design's research section that documentation could not settle, checked by hand on 2026-11-23 in the Claude Code tab of the Claude desktop app (macOS 15, Apple Silicon), with the session in the default (ask) permission mode.
 
-1. Does Claude Code end the hook process when the user answers in Claude's own prompt first? Pending end-to-end test.
-2. The exact deny output shape, confirmed against a live session. Pending end-to-end test.
-3. Does the desktop app pick up a newly added hook without a restart? Pending end-to-end test.
-4. What does Claude Code do with hook output that arrives after the user answered in its own prompt? Pending end-to-end test.
+1. Does Claude Code end the hook process when the user answers in Claude's own prompt first? Not tested. The reverse was confirmed: answering the card dismissed Claude's own prompt, which had been showing alongside it.
+2. The exact deny output shape. Confirmed: a Deny from the card stopped the command, and Claude received the message "The user denied this request from the permission popup."
+3. Does the desktop app pick up a newly added hook without a restart? Yes for an existing session: the hook took effect in a session that was already open before it was installed. In auto permission mode no request reaches the hook at all, so no card appears; that is expected.
+4. What does Claude Code do with hook output that arrives after the user answered in its own prompt? Not tested (depends on item 1).
+
+Also confirmed in the same run:
+
+- Allow ran the command; Always Allow ran it and Claude Code wrote the offered rule to the project's `.claude/settings.local.json` itself.
+- Three requests at once stacked as three cards; ⌃⌥Return answered the oldest, and focus stayed in the app being used.
+- With the app quit, the helper found no socket and printed nothing: Claude's own prompt handled the request and no history entry was written.
+- Idle memory use was about 30 MB.
