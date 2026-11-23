@@ -285,6 +285,9 @@ final class PanelController {
         let state = CardState()
         state.isNext = isNext
         let panel = CardPanel(contentRect: frame, keyable: true)
+        panel.acceptsClick = { [weak self] in
+            self?.cards[id]?.arming.acceptsClick(at: Date()) ?? false
+        }
         panel.onAllow = { [weak self] in self?.decideFromCard(id, .allow) }
         panel.onDeny = { [weak self] in self?.decideFromCard(id, .deny(message: denyMessage)) }
         let host = CardHostingView(rootView: makeView(request, state: state))
@@ -314,6 +317,7 @@ final class PanelController {
         let panel = card.panel
         panel.onAllow = nil
         panel.onDeny = nil
+        panel.acceptsClick = { false }
         panel.markDismissed()
         panel.ignoresMouseEvents = true
         NSAnimationContext.runAnimationGroup { context in

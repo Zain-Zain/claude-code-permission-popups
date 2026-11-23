@@ -43,6 +43,12 @@ struct CardView: View {
             if let primary = summary.primary, !primary.isEmpty {
                 PrimaryTextBlock(text: primary,
                                  textWidth: Self.width - 2 * Self.padding - 2 * PrimaryTextBlock.inset)
+                // Outside the scrolling box, so it is visible without scrolling.
+                if let note = summary.truncationNote {
+                    Text(note)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.orange)
+                }
             }
             if let detail = summary.detail, !detail.isEmpty {
                 Text(detail)

@@ -35,8 +35,15 @@ final class CardPanel: NSPanel {
         worksWhenModal = true
     }
 
-    /// Set by a mouse-down on this card, cleared when it stops being key or is dismissed.
+    /// Whether a click may reach the card right now (`ArmState`). While false, the whole
+    /// click (down, drags, up) is swallowed: no button acts and the card does not become key.
+    var acceptsClick: () -> Bool = { false }
+
+    /// Set by a mouse-down on this card, cleared when it stops being key or is dismissed,
+    /// or when the mouse-down did not make it key.
     private var clickArmed = false
+    /// Swallowing the rest of a click that started while the card was disarmed.
+    private var swallowingClick = false
     private var dismissed = false
 
     /// Only a mouse-down on this card can make it key. When another window closes or
@@ -63,8 +70,29 @@ final class CardPanel: NSPanel {
     /// command text) can consume them, so each press triggers exactly one decision.
     /// Key events only reach a window that is key, so this acts on the clicked card alone.
     override func sendEvent(_ event: NSEvent) {
-        if event.type == .leftMouseDown { clickArmed = true } // before super makes it key
-        if event.type == .keyDown, handleDecisionKey(event) { return }
+        switch event.type {
+        case .leftMouseDown:
+            guard acceptsClick() else {
+                swallowingClick = true
+                return
+            }
+            swallowingClick = false
+            clickArmed = true // before super makes it key
+            super.sendEvent(event)
+            // Mouse tracking is over when super returns; a click that did not make the card
+            // key (a subview that does not need it) must not leave it able to become key later.
+            if !isKeyWindow { clickArmed = false }
+            return
+        case .leftMouseDragged where swallowingClick:
+            return
+        case .leftMouseUp where swallowingClick:
+            swallowingClick = false
+            return
+        case .keyDown:
+            if handleDecisionKey(event) { return }
+        default:
+            break
+        }
         super.sendEvent(event)
     }
 

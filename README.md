@@ -62,7 +62,7 @@ Keyboard:
 - Cards never take focus. Click a card to make it the active window, then press Return to allow or Escape to deny.
 - Control-Option-Return allows and Control-Option-Escape denies the oldest card, from any app. These need no Accessibility permission.
 - Always Allow has no shortcut and cannot be reached with Tab or Space. It needs a click.
-- A card that just appeared or just moved (because another card was answered) ignores clicks and Return/Escape for half a second after it settles, and its buttons are dimmed until then. The shortcuts likewise act only on a card that has been the oldest for half a second. This stops a click or shortcut aimed at one card from landing on another you have not read.
+- A card that just appeared or just moved (because another card was answered) ignores clicks and Return/Escape for half a second after it settles, and its buttons are dimmed until then. The shortcuts likewise act only on a card that has been the oldest for half a second, and act once per press: holding them down does nothing more until you release them. This stops a click or shortcut aimed at one card from landing on another you have not read.
 
 Up to four cards are shown, oldest nearest the corner, with a "+N more" pill for the rest. A card is removed when it is answered, or when the connection closes because the session ended or the hook timed out. Whether the card also disappears when you answer in Claude's own prompt is not verified; see [Verification results](docs/architecture.md#verification-results). If it stays, it clears at the hook timeout.
 

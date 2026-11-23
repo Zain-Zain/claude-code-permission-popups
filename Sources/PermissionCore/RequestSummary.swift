@@ -10,12 +10,21 @@ public struct AlwaysAllowRule: Equatable, Sendable {
 
 public struct RequestSummary: Equatable, Sendable {
     public let headline: String
+    /// The command, path or input, cut at `maxPrimaryLength` characters (ending in "…" if cut).
     public let primary: String?
+    /// How many characters of `primary` were cut off (0 if none).
+    public let primaryHiddenCharacters: Int
     public let detail: String?
     public let cwd: String?
     public let rules: [AlwaysAllowRule]
 
     public var alwaysAllowRules: [String] { rules.map(\.text) }
+
+    /// "(N more characters not shown)" when `primary` was cut, for display outside the
+    /// scrolling text so a harmless head cannot hide a dangerous tail.
+    public var truncationNote: String? {
+        primaryHiddenCharacters > 0 ? "(\(primaryHiddenCharacters) more characters not shown)" : nil
+    }
 
     public static let maxPrimaryLength = 2000
     static let maxEditSideLength = 200  // including the ellipsis
@@ -33,35 +42,35 @@ public struct RequestSummary: Equatable, Sendable {
         switch r.toolName {
         case "Bash":
             headline = "Claude wants to run a command"
-            primary = str("command").map(cap)
+            primary = str("command")
             detail = str("description").map(cap)
         case "Edit", "MultiEdit":
             headline = "Claude wants to edit a file"
-            primary = str("file_path").map(cap)
+            primary = str("file_path")
             let first = r.toolName == "MultiEdit" ? input["edits"]?.arrayValue?.first : input
             if let old = first?["old_string"]?.stringValue, let new = first?["new_string"]?.stringValue {
                 detail = "− \(Self.clipped(old, limit: Self.maxEditSideLength - 1))\n+ \(Self.clipped(new, limit: Self.maxEditSideLength - 1))"
             }
         case "Write":
             headline = "Claude wants to create a file"
-            primary = str("file_path").map(cap)
+            primary = str("file_path")
         case "Read":
             headline = "Claude wants to read a file"
-            primary = str("file_path").map(cap)
+            primary = str("file_path")
         case "Grep", "Glob":
             headline = "Claude wants to search files"
-            primary = str("pattern").map(cap)
+            primary = str("pattern")
         case "WebFetch":
             headline = "Claude wants to fetch a web page"
-            primary = str("url").map(cap)
+            primary = str("url")
         case "WebSearch":
             headline = "Claude wants to search the web"
-            primary = str("query").map(cap)
+            primary = str("query")
         case "ExitPlanMode":
             headline = "Claude wants to approve its plan"
             primary = str("plan").map {
-                cap($0.split(separator: "\n", omittingEmptySubsequences: false)
-                    .prefix(Self.planLineLimit).joined(separator: "\n"))
+                $0.split(separator: "\n", omittingEmptySubsequences: false)
+                    .prefix(Self.planLineLimit).joined(separator: "\n")
             }
         default:
             if r.toolName.hasPrefix("mcp__") {
@@ -72,11 +81,13 @@ public struct RequestSummary: Equatable, Sendable {
             } else {
                 headline = "Claude wants to use \(r.toolName)"
             }
-            primary = cap(input.compactString(maxLength: .max))
+            primary = input.compactString(maxLength: .max)
         }
 
         self.headline = headline
-        self.primary = primary
+        let cut = primary.map { Self.cut($0, limit: Self.maxPrimaryLength) }
+        self.primary = cut?.text
+        self.primaryHiddenCharacters = cut?.hidden ?? 0
         self.detail = detail
         self.cwd = r.cwd.map { Self.abbreviate($0, home: homeDirectory) }
         self.rules = Self.displayRules(alwaysAllowUpdates(from: r.permissionSuggestions))
@@ -101,12 +112,16 @@ public struct RequestSummary: Equatable, Sendable {
         return (lines, hidden)
     }
 
-    /// `primary` text over `limit` characters is cut, with an ellipsis and a line saying
-    /// exactly how many characters are hidden (a harmless head must not hide a dangerous tail).
-    static func capped(_ s: String, limit: Int = RequestSummary.maxPrimaryLength) -> String {
+    /// Text over `limit` characters is cut and ends in "…"; `hidden` is the exact number of
+    /// characters left out (0 if nothing was cut).
+    static func cut(_ s: String, limit: Int) -> (text: String, hidden: Int) {
         let total = s.count
-        guard total > limit else { return s }
-        return String(s.prefix(limit)) + "…\n(\(total - limit) more characters not shown)"
+        guard total > limit else { return (s, 0) }
+        return (String(s.prefix(limit)) + "…", total - limit)
+    }
+
+    static func capped(_ s: String, limit: Int = RequestSummary.maxPrimaryLength) -> String {
+        cut(s, limit: limit).text
     }
 
     /// Short single-line cut for the edit preview, which is never the thing being approved alone.

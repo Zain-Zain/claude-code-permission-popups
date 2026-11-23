@@ -1,8 +1,10 @@
 import Carbon.HIToolbox
 import Foundation
+import PermissionCore
 
 /// Global ⌃⌥Return (allow) and ⌃⌥Escape (deny), through Carbon `RegisterEventHotKey`,
 /// which needs no Accessibility permission. Handlers run on the main thread.
+/// Each physical press fires once: a held key does nothing more until it is released.
 final class HotKeys {
     private static let signature: OSType = 0x5050_4F50 // "PPOP"
     private static let allowID: UInt32 = 1
@@ -12,6 +14,7 @@ final class HotKeys {
     private let onDeny: () -> Void
     private var handler: EventHandlerRef?
     private var hotKeys: [EventHotKeyRef] = []
+    private var latch = HotKeyLatch()
 
     init(onAllow: @escaping () -> Void, onDeny: @escaping () -> Void) {
         self.onAllow = onAllow
@@ -24,8 +27,10 @@ final class HotKeys {
     /// logged and skipped; the cards still work by click.
     func register() {
         guard handler == nil else { return }
-        var eventType = EventTypeSpec(eventClass: OSType(kEventClassKeyboard),
-                                      eventKind: UInt32(kEventHotKeyPressed))
+        var eventTypes = [
+            EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed)),
+            EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyReleased)),
+        ]
         let context = Unmanaged.passUnretained(self).toOpaque()
         let status = InstallEventHandler(GetApplicationEventTarget(), { _, event, context in
             guard let event, let context else { return OSStatus(eventNotHandledErr) }
@@ -36,9 +41,14 @@ final class HotKeys {
             guard got == noErr, id.signature == HotKeys.signature else {
                 return OSStatus(eventNotHandledErr)
             }
-            Unmanaged<HotKeys>.fromOpaque(context).takeUnretainedValue().fire(id.id)
+            let hotKeys = Unmanaged<HotKeys>.fromOpaque(context).takeUnretainedValue()
+            if GetEventKind(event) == UInt32(kEventHotKeyReleased) {
+                hotKeys.released(id.id)
+            } else {
+                hotKeys.pressed(id.id)
+            }
             return noErr
-        }, 1, &eventType, context, &handler)
+        }, eventTypes.count, &eventTypes, context, &handler)
         guard status == noErr else {
             NSLog("%@", "hotkeys: InstallEventHandler failed (\(status)); cards still work by click")
             return
@@ -67,7 +77,12 @@ final class HotKeys {
         }
     }
 
-    private func fire(_ id: UInt32) {
+    private func released(_ id: UInt32) {
+        latch.release(id)
+    }
+
+    private func pressed(_ id: UInt32) {
+        guard latch.press(id) else { return } // still held since the last press
         switch id {
         case Self.allowID: onAllow()
         case Self.denyID: onDeny()

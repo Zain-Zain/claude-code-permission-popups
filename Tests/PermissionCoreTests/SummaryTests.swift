@@ -102,15 +102,24 @@ import Testing
     /// A truncated primary says exactly how much is hidden, so a harmless head cannot hide the rest.
     @Test func capsHugePrimary() throws {
         let sum = try make("Bash", .object(["command": s(String(repeating: "x", count: 10_000))]))
-        #expect(sum.primary == String(repeating: "x", count: 2000) + "…\n(8000 more characters not shown)")
+        #expect(sum.primary == String(repeating: "x", count: 2000) + "…")
+        // The note is separate, so the card can show it outside the scrolling box.
+        #expect(sum.primaryHiddenCharacters == 8000)
+        #expect(sum.truncationNote == "(8000 more characters not shown)")
         // Compact MCP JSON: {"k":"yyy…"} is 10,008 characters.
         let mcp = try make("mcp__a__b", .object(["k": s(String(repeating: "y", count: 10_000))]), mcp: s("a"))
         let p = try #require(mcp.primary)
         #expect(p.hasPrefix(#"{"k":"yyy"#))
-        #expect(p.hasSuffix("…\n(8008 more characters not shown)"))
+        #expect(p.count == 2001)
+        #expect(mcp.truncationNote == "(8008 more characters not shown)")
         // At the cap exactly: nothing is hidden, nothing is added.
         let exact = try make("Bash", .object(["command": s(String(repeating: "z", count: 2000))]))
         #expect(exact.primary == String(repeating: "z", count: 2000))
+        #expect(exact.primaryHiddenCharacters == 0)
+        #expect(exact.truncationNote == nil)
+        // Detail text (Claude's description) is cut but never counted as hidden primary text.
+        let longDescription = try make("Bash", .object(["command": s("ls"), "description": s(String(repeating: "d", count: 3000))]))
+        #expect(longDescription.primaryHiddenCharacters == 0)
     }
 
     @Test func mcpServerObjectNamesServer() throws {
