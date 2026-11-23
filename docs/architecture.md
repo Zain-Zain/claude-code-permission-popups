@@ -69,7 +69,9 @@ The helper maps the reply to Claude Code's output format, so knowledge of that s
 
 If the host does not end the helper when you answer in Claude's own prompt, the card may stay until the hook timeout. What Claude Code does with a late answer is not documented and is listed under Verification results.
 
-According to the Claude Code hooks reference, PermissionRequest also fires where Claude Code would otherwise auto-deny because nobody can answer, so those requests get a card too. According to the same reference, a hook that times out or exits without a decision leaves the normal permission flow unchanged. `AskUserQuestion` never reaches the app: the helper exits silently for it.
+According to the Claude Code hooks reference, PermissionRequest also fires where Claude Code would otherwise auto-deny because nobody can answer, so those requests get a card too. According to the same reference, a hook that times out or exits without a decision leaves the normal permission flow unchanged. `AskUserQuestion` and `ExitPlanMode` never reach the app: the helper exits silently for them, so Claude's own dialog handles them.
+
+This is a deliberate deviation from the design (§5.4 lists `ExitPlanMode` as a normal "approve its plan" card). The hooks reference says `ExitPlanMode` needs `updatedInput` on allow and that returning `"allow"` alone is not sufficient. The popup has no reliable way to send the plan back, and Claude's own plan dialog offers more choices (such as accepting edits automatically), so plan approvals stay there. The plan summary in `RequestSummary` is kept but is not reached through the helper.
 
 ## Security model
 

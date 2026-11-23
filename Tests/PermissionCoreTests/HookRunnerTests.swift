@@ -84,6 +84,18 @@ private func serve(_ path: String, reply: WireReply, counter: Counter = Counter(
         #expect(counter.count == 0)
     }
 
+    /// Plan approvals need `updatedInput`, which the popup cannot supply: Claude's own dialog answers them.
+    @Test func exitPlanModeSkipsSocket() async throws {
+        let path = socketPath()
+        let counter = Counter()
+        let server = try serve(path, reply: WireReply(.allow), counter: counter)
+        defer { server.stop() }
+        let input = Data(#"{"session_id":"s","hook_event_name":"PermissionRequest","tool_name":"ExitPlanMode","tool_input":{"plan":"1. Do it"}}"#.utf8)
+        #expect(await runInBackground(input, path) == nil)
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(counter.count == 0)
+    }
+
     @Test func noServerPrintsNothing() throws {
         #expect(HookRunner.run(stdin: try fixture("bash"), socketPath: socketPath()) == nil)
     }

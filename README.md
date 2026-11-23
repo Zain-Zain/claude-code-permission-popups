@@ -123,6 +123,7 @@ There are no third-party dependencies. See [docs/architecture.md](docs/architect
 - **The hook does not fire.** Whether a newly added hook takes effect in a running session is not verified. If it does not fire, start a new Claude Code session.
 - **No card appears.** Check that the app is running (menu bar icon), **Popups** is on, and the menu shows **Hook: Installed**. If the app is off, was quit, or crashed, the helper prints nothing and Claude shows its own prompt as usual.
 - **No card for a question Claude asks you.** The AskUserQuestion tool is never shown; it is not a permission decision.
+- **No card for a plan approval.** When Claude asks to leave plan mode (ExitPlanMode), answer in Claude's own dialog. Claude Code needs the plan sent back with an approval, which the popup does not do, so the helper stays silent for it. Claude's dialog also offers more choices, such as accepting edits automatically.
 - **Gatekeeper blocks the app.** A build you compiled yourself opens normally. A build downloaded from elsewhere is ad-hoc signed and not notarized, so macOS may say it is from an unidentified developer. On macOS 15 and later, open System Settings, Privacy & Security, and choose "Open Anyway" for the app, or rebuild it from source.
 - **`codesign --verify --strict` fails.** A checkout inside an iCloud-synced folder can gain extended attributes that fail strict verification. `codesign --verify` without `--strict` passes.
 
