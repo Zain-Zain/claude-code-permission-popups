@@ -61,8 +61,8 @@ The helper maps the reply to Claude Code's output format, so knowledge of that s
 ## Request lifecycle
 
 1. A connection arrives. The app checks the peer UID, reads the request line, and builds a pending request (id, time, tool, summary, `cwd`, short session id, suggestions).
-2. If popups are off, or the request is unreadable, the app replies `pass` and closes the connection.
-3. Otherwise a card appears without taking focus, with an optional sound.
+2. If popups are off, the request is unreadable, or its wire version is not 1, the app replies `pass` and closes the connection. Turning popups off also replies `pass` to every open request and records each as "answered elsewhere".
+3. Otherwise a card appears without taking focus, with an optional sound. If there is no screen to show it on (for example every display is asleep), the request is passed after 5 s and recorded as "answered elsewhere"; layout still retries whenever the screens change.
 4. On a decision the app writes the reply, closes the connection, removes the card, and appends a history entry.
 5. If the connection closes first (the session ended, the hook timed out, or Claude Code ended the helper after you answered in its own prompt; the last is not verified), the card is removed and history records "answered elsewhere / expired".
 6. If the app quits with requests pending, it replies `pass` to each. If it crashes, the helpers see the closed connection and print nothing. Either way Claude falls back to its own prompts.

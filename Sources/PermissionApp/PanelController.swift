@@ -25,6 +25,8 @@ final class PanelController {
 
     private static let fadeDuration: TimeInterval = 0.15
     private static let slideDistance: CGFloat = 8
+    /// With no screen to show a card on, a request without a card is passed after this long.
+    private static let noScreenGrace: TimeInterval = 5
 
     private let queue: RequestQueue
     private let prefs: Preferences
@@ -40,6 +42,9 @@ final class PanelController {
     private var clockTick: AnyCancellable?
     private var subscriptions: Set<AnyCancellable> = []
     private var relayoutScheduled = false
+    /// Requests with no card while there is no screen, and since when.
+    private var cardlessSince: [UUID: Date] = [:]
+    private var cardlessCheck: Task<Void, Never>?
 
     init(queue: RequestQueue, prefs: Preferences, decide: @escaping (UUID, Decision) -> Void) {
         self.queue = queue
@@ -86,6 +91,7 @@ final class PanelController {
         heights = heights.filter { live.contains($0.key) }
 
         guard !pending.isEmpty else {
+            stopCardlessTracking()
             screen = nil
             hidePill()
             stopClock()
@@ -95,7 +101,12 @@ final class PanelController {
 
         if let current = screen, !NSScreen.screens.contains(current) { screen = nil }
         if screen == nil { screen = Self.screenWithMouse() }
-        guard let screen else { return }
+        guard let screen else {
+            trackCardless(pending)
+            log("layout: no screen, pending=\(pending.count)")
+            return
+        }
+        stopCardlessTracking()
         startClock()
 
         let visibleFrame = screen.visibleFrame
@@ -158,6 +169,54 @@ final class PanelController {
         let height = ceil(probe.fittingSize.height)
         heights[request.id] = height
         return height
+    }
+
+    // MARK: - No screen
+
+    /// No screen to place cards on (displays asleep or being reconfigured): note when each
+    /// request without a card started waiting, and check again once the grace period is up.
+    /// Layout still retries on every screen change.
+    private func trackCardless(_ pending: [PendingRequest]) {
+        let now = Date()
+        let live = Set(pending.map(\.id))
+        cardlessSince = cardlessSince.filter { live.contains($0.key) && cards[$0.key] == nil }
+        for request in pending where cards[request.id] == nil && cardlessSince[request.id] == nil {
+            cardlessSince[request.id] = now
+        }
+        scheduleCardlessCheck()
+    }
+
+    private func stopCardlessTracking() {
+        cardlessSince = [:]
+        cardlessCheck?.cancel()
+        cardlessCheck = nil
+    }
+
+    private func scheduleCardlessCheck() {
+        guard cardlessCheck == nil, let earliest = cardlessSince.values.min() else { return }
+        let wait = max(0, earliest.addingTimeInterval(Self.noScreenGrace).timeIntervalSinceNow) + 0.01
+        cardlessCheck = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(wait * 1_000_000_000))
+            guard !Task.isCancelled, let self else { return }
+            self.cardlessCheck = nil
+            self.passCardless()
+        }
+    }
+
+    /// Passes (Claude's own prompt takes over, recorded as answered elsewhere) every request
+    /// that has had no card for the grace period, unless a screen has appeared meanwhile.
+    private func passCardless() {
+        relayout() // a screen may be back; this clears the tracking if so
+        let now = Date()
+        let due = cardlessSince
+            .filter { cards[$0.key] == nil && now.timeIntervalSince($0.value) >= Self.noScreenGrace }
+            .map(\.key)
+        for id in due {
+            cardlessSince[id] = nil
+            log("card: no screen for \(Int(Self.noScreenGrace))s, passing \(id)")
+            decide(id, .pass)
+        }
+        scheduleCardlessCheck()
     }
 
     // MARK: - Cards

@@ -12,6 +12,8 @@ final class StatusMenu: NSObject, NSMenuDelegate {
     private let panels: PanelController?
     private let history: HistoryWindowController
     private let hook = HookInstallFlow()
+    /// Called after the user turns Popups off, so open cards go to Claude's own prompt too.
+    private let onPopupsTurnedOff: () -> Void
 
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let menu = NSMenu()
@@ -26,8 +28,10 @@ final class StatusMenu: NSObject, NSMenuDelegate {
 
     private var isBundledApp: Bool { Bundle.main.bundleURL.pathExtension == "app" }
 
-    init(prefs: Preferences, queue: RequestQueue, panels: PanelController?, historyStore: HistoryStore) {
+    init(prefs: Preferences, queue: RequestQueue, panels: PanelController?, historyStore: HistoryStore,
+         onPopupsTurnedOff: @escaping () -> Void) {
         self.prefs = prefs
+        self.onPopupsTurnedOff = onPopupsTurnedOff
         self.queue = queue
         self.panels = panels
         self.history = HistoryWindowController(store: historyStore)
@@ -134,7 +138,10 @@ final class StatusMenu: NSObject, NSMenuDelegate {
 
     // MARK: - Actions
 
-    @objc private func togglePopups() { prefs.popupsEnabled.toggle() }
+    @objc private func togglePopups() {
+        prefs.popupsEnabled.toggle()
+        if !prefs.popupsEnabled { onPopupsTurnedOff() }
+    }
     @objc private func toggleSound() { prefs.soundEnabled.toggle() }
 
     @objc private func selectCorner(_ sender: NSMenuItem) {

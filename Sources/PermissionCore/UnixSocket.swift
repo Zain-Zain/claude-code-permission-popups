@@ -13,8 +13,9 @@ public enum SocketError: Error, Equatable {
     case system(call: String, errno: Int32)
 }
 
-/// Low-level helpers shared by `SocketServer` and `SocketClient`.
-enum UnixSocket {
+/// Low-level helpers shared by `SocketServer` and `SocketClient` (and the app's
+/// single-instance probe, which uses `connect`).
+public enum UnixSocket {
     static let maxPathBytes = 104
 
     /// Calls `body` with a `sockaddr_un` for `path`.
@@ -47,8 +48,8 @@ enum UnixSocket {
         _ = fcntl(fd, F_SETFL, on ? flags | O_NONBLOCK : flags & ~O_NONBLOCK)
     }
 
-    /// Opens a blocking client socket connected to `path`.
-    static func connect(path: String) throws -> Int32 {
+    /// Opens a blocking client socket connected to `path`. The caller closes it.
+    public static func connect(path: String) throws -> Int32 {
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
         guard fd >= 0 else { throw SocketError.system(call: "socket", errno: errno) }
         configure(fd, nonBlocking: false)

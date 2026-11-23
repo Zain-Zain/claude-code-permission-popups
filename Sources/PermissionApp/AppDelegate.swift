@@ -44,7 +44,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.decide(id: id, decision: decision)
         }
 
-        statusMenu = StatusMenu(prefs: prefs, queue: queue, panels: panels, historyStore: history)
+        statusMenu = StatusMenu(prefs: prefs, queue: queue, panels: panels, historyStore: history,
+                                onPopupsTurnedOff: { [weak self] in
+                                    guard let self else { return }
+                                    self.log("popups off: passed \(self.passAllPending()) pending request(s)")
+                                })
 
         let server = SocketServer(path: AppPaths.socketPath) { [weak self] wire, responder in
             self?.handle(wire, responder: responder)
@@ -70,15 +74,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        // Helpers get "pass" (print nothing), so Claude falls back to its own prompts.
-        let open = queue.pending
-        queue.passAll()
-        for request in open {
-            record(HistoryEntry(pending: request, outcome: .answeredElsewhere))
-        }
+        let passed = passAllPending()
         server?.stop()
         hotKeys?.unregister()
-        log("quit: passed \(open.count) pending request(s)")
+        log("quit: passed \(passed) pending request(s)")
+    }
+
+    /// Answers every open request `pass` (the helpers print nothing, so Claude falls back to
+    /// its own prompts) and records each as answered elsewhere. Used on quit and when Popups
+    /// is turned off. Returns how many were passed.
+    @discardableResult
+    private func passAllPending() -> Int {
+        let open = queue.pending
+        for request in open {
+            decide(id: request.id, decision: .pass)
+        }
+        return open.count
     }
 
     // MARK: - Decisions
@@ -190,22 +201,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// A plain connect, sending nothing: true if a server accepts on `path`.
     private static func isServerListening(at path: String) -> Bool {
-        var address = sockaddr_un()
-        let bytes = Array(path.utf8)
-        guard bytes.count < MemoryLayout.size(ofValue: address.sun_path) else { return false }
-        address.sun_family = sa_family_t(AF_UNIX)
-        address.sun_len = UInt8(MemoryLayout<sockaddr_un>.size)
-        withUnsafeMutableBytes(of: &address.sun_path) { $0.copyBytes(from: bytes) }
-
-        let fd = socket(AF_UNIX, SOCK_STREAM, 0)
-        guard fd >= 0 else { return false }
-        defer { close(fd) }
-        let result = withUnsafePointer(to: &address) {
-            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
-                connect(fd, $0, socklen_t(MemoryLayout<sockaddr_un>.size))
-            }
-        }
-        return result == 0
+        guard let fd = try? UnixSocket.connect(path: path) else { return false }
+        close(fd)
+        return true
     }
 
     private func log(_ message: String) {

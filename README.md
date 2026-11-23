@@ -72,7 +72,7 @@ According to the Claude Code hooks reference, in the desktop app and the VS Code
 
 The menu bar icon is the whole settings UI:
 
-- **Popups**: when off, every request goes to Claude's own prompt.
+- **Popups**: when off, every request goes to Claude's own prompt. Turning it off also hands any cards already shown back to Claude's prompt.
 - **Sound**: a short sound when a card appears.
 - **Position**: Bottom Left, Bottom Right, Top Left, or Top Right.
 - **Open at Login**: registered on first launch; toggle it here.
