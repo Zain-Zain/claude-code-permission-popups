@@ -91,8 +91,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         record(HistoryEntry(pending: request, outcome: outcome))
     }
 
+    /// Hotkeys act only on an armed oldest card: shown, still, and the oldest for at least
+    /// the arming delay. A card that just became the oldest (or holding the keys down) does nothing.
     private func decideOldest(_ decision: Decision) {
         guard let oldest = queue.oldest else { return }
+        guard panels?.acceptsHotkey(for: oldest.id) == true else {
+            log("hotkey: ignored, oldest card not armed yet")
+            return
+        }
         decide(id: oldest.id, decision: decision)
     }
 

@@ -10,6 +10,9 @@ final class CardState: ObservableObject {
     @Published var hovered = false
     /// A short pulse from `PanelController.highlightOldest()`.
     @Published var flashing = false
+    /// Shown, still and settled long enough for clicks to count (see `ArmState`).
+    /// Until then the buttons are dimmed and do nothing.
+    @Published var armed = false
 }
 
 /// One shared clock for every card's elapsed time. It only ticks while cards exist.
@@ -119,6 +122,7 @@ struct CardView: View {
                 .focusable(false)
         }
         .padding(.top, 2)
+        .opacity(state.armed ? 1 : 0.55)
     }
 
     private var borderColor: Color {

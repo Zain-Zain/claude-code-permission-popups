@@ -8,9 +8,19 @@ import PermissionCore
 /// clock ticks only while at least one request is pending.
 @MainActor
 final class PanelController {
-    private struct Card {
+    private final class Card {
         let panel: CardPanel
         let state: CardState
+        /// The frame this card is placed (or animating) at.
+        var slot: CGRect
+        /// When clicks and hotkeys may act on this card (see `ArmState`).
+        var arming = ArmState()
+
+        init(panel: CardPanel, state: CardState, slot: CGRect) {
+            self.panel = panel
+            self.state = state
+            self.slot = slot
+        }
     }
 
     private static let fadeDuration: TimeInterval = 0.15
@@ -47,6 +57,12 @@ final class PanelController {
         NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)
             .sink { [weak self] _ in self?.screensChanged() }
             .store(in: &subscriptions)
+    }
+
+    /// The global hotkeys may act on `id` only if it is the oldest card and has been shown,
+    /// still, and the oldest for the arming delay. Otherwise the hotkey does nothing.
+    func acceptsHotkey(for id: UUID) -> Bool {
+        cards[id]?.arming.acceptsHotkey(at: Date()) ?? false
     }
 
     /// Briefly pulses the oldest card (the one the hotkeys act on) and brings it to front.
@@ -153,21 +169,56 @@ final class PanelController {
             pending: request,
             state: state,
             clock: clock,
-            onDeny: { [weak self] in self?.decide(id, .deny(message: denyMessage)) },
-            onAlwaysAllow: { [weak self] in self?.decide(id, .allowAlways(updatedPermissions: updates)) },
-            onAllow: { [weak self] in self?.decide(id, .allow) }
+            onDeny: { [weak self] in self?.decideFromCard(id, .deny(message: denyMessage)) },
+            onAlwaysAllow: { [weak self] in self?.decideFromCard(id, .allowAlways(updatedPermissions: updates)) },
+            onAllow: { [weak self] in self?.decideFromCard(id, .allow) }
         )
+    }
+
+    /// Buttons, Return and Escape on a card decide only once the card is armed, so a click
+    /// meant for another card, or for the app under a card that just appeared, does nothing.
+    private func decideFromCard(_ id: UUID, _ decision: Decision) {
+        guard let card = cards[id] else { return }
+        guard card.arming.acceptsClick(at: Date()) else {
+            log("card: input ignored, not armed yet \(id)")
+            return
+        }
+        decide(id, decision)
+    }
+
+    /// Restarts the card's arming after a show, move or new-oldest, dims its buttons until
+    /// then, and re-checks when the delay is up.
+    private func updateArming(_ card: Card, moved: Bool, isNext: Bool) {
+        let now = Date()
+        if moved { card.arming.moved(settlingAt: now.addingTimeInterval(Self.fadeDuration)) }
+        card.arming.setOldest(isNext, at: now)
+        refreshArmed(card)
+        guard !card.state.armed, let armsAt = card.arming.armsAt else { return }
+        let wait = max(0, armsAt.timeIntervalSince(now)) + 0.01
+        Task { @MainActor [weak self, weak card] in
+            try? await Task.sleep(nanoseconds: UInt64(wait * 1_000_000_000))
+            guard let self, let card else { return }
+            self.refreshArmed(card)
+        }
+    }
+
+    private func refreshArmed(_ card: Card) {
+        let armed = card.arming.acceptsClick(at: Date())
+        if card.state.armed != armed { card.state.armed = armed }
     }
 
     private func place(_ request: PendingRequest, at frame: CGRect, isNext: Bool, corner: Corner) {
         if let card = cards[request.id] {
             if card.state.isNext != isNext { card.state.isNext = isNext }
-            if card.panel.frame != frame {
+            let moved = card.slot != frame
+            if moved {
+                card.slot = frame
                 NSAnimationContext.runAnimationGroup { context in
                     context.duration = Self.fadeDuration
                     card.panel.animator().setFrame(frame, display: true)
                 }
             }
+            updateArming(card, moved: moved, isNext: isNext)
             return
         }
 
@@ -175,13 +226,15 @@ final class PanelController {
         let state = CardState()
         state.isNext = isNext
         let panel = CardPanel(contentRect: frame, keyable: true)
-        panel.onAllow = { [weak self] in self?.decide(id, .allow) }
-        panel.onDeny = { [weak self] in self?.decide(id, .deny(message: denyMessage)) }
+        panel.onAllow = { [weak self] in self?.decideFromCard(id, .allow) }
+        panel.onDeny = { [weak self] in self?.decideFromCard(id, .deny(message: denyMessage)) }
         let host = CardHostingView(rootView: makeView(request, state: state))
         host.sizingOptions = []
         host.onHoverChange = { [weak state] hovering in state?.hovered = hovering }
         panel.contentView = host
-        cards[id] = Card(panel: panel, state: state)
+        let card = Card(panel: panel, state: state, slot: frame)
+        cards[id] = card
+        updateArming(card, moved: true, isNext: isNext)
 
         // Fade and slide in from the corner's side. Never makeKey: the panel must not take focus.
         let isBottom = corner == .bottomLeft || corner == .bottomRight
