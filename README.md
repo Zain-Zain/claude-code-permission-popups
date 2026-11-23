@@ -65,7 +65,7 @@ Keyboard:
 
 Up to four cards are shown, oldest nearest the corner, with a "+N more" pill for the rest. A card is removed when it is answered or when Claude Code stops waiting for it (for example, you answered in Claude's own prompt).
 
-In the Claude desktop app and VS Code, Claude's own prompt is shown alongside the card. Whichever you answer first wins.
+According to the Claude Code hooks reference, in the desktop app and the VS Code extension the hook runs alongside Claude's own permission prompt, and whichever decides first applies.
 
 ## Configuration
 
@@ -120,19 +120,19 @@ There are no third-party dependencies. See [docs/architecture.md](docs/architect
 
 ## Troubleshooting
 
-- **The hook does not fire.** Claude Code may only read a new hook when a session starts. Start a new Claude Code session after installing it.
+- **The hook does not fire.** Whether a newly added hook takes effect in a running session is not verified. If it does not fire, start a new Claude Code session.
 - **No card appears.** Check that the app is running (menu bar icon), **Popups** is on, and the menu shows **Hook: Installed**. If the app is off, was quit, or crashed, the helper prints nothing and Claude shows its own prompt as usual.
 - **No card for a question Claude asks you.** The AskUserQuestion tool is never shown; it is not a permission decision.
-- **Gatekeeper blocks the app.** A build you compiled yourself opens normally. A build downloaded from elsewhere is ad-hoc signed and not notarized, so macOS may say it is from an unidentified developer. Control-click the app and choose Open, or rebuild it from source.
+- **Gatekeeper blocks the app.** A build you compiled yourself opens normally. A build downloaded from elsewhere is ad-hoc signed and not notarized, so macOS may say it is from an unidentified developer. On macOS 15 and later, open System Settings, Privacy & Security, and choose "Open Anyway" for the app, or rebuild it from source.
 - **`codesign --verify --strict` fails.** A checkout inside an iCloud-synced folder can gain extended attributes that fail strict verification. `codesign --verify` without `--strict` passes.
 
 ## Limitations
 
-- Builds made with Command Line Tools only are arm64-only. A universal (arm64 and x86_64) bundle needs full Xcode; the build script falls back to the host architecture.
+- Builds made with Command Line Tools only are host-architecture-only (arm64 on Apple Silicon). A universal (arm64 and x86_64) bundle needs full Xcode; the build script falls back to the host architecture.
 - The app is ad-hoc signed and not notarized.
 - Always Allow forwards only Claude Code's `addRules` allow suggestions. Mode changes (such as switching to accept-edits) and other suggestion types are never forwarded.
 - There is no "deny and stop Claude" option.
-- The CLI and VS Code are expected to work but are less tested than the desktop app.
+- VS Code and the CLI were not part of the end-to-end checks; only the desktop app was tested.
 
 ## License
 

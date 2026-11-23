@@ -64,20 +64,21 @@ The helper maps the reply to Claude Code's output format, so knowledge of that s
 2. If popups are off, or the request is unreadable, the app replies `pass` and closes the connection.
 3. Otherwise a card appears without taking focus, with an optional sound.
 4. On a decision the app writes the reply, closes the connection, removes the card, and appends a history entry.
-5. If the connection closes first (Claude got an answer in its own prompt and ended the helper, the session ended, or the hook timed out), the card is removed and history records "answered elsewhere / expired".
+5. If the connection closes first (the session ended, the hook timed out, or Claude Code ended the helper after you answered in its own prompt; the last is not verified), the card is removed and history records "answered elsewhere / expired".
 6. If the app quits with requests pending, it replies `pass` to each. If it crashes, the helpers see the closed connection and print nothing. Either way Claude falls back to its own prompts.
 
-If the host does not end the helper when you answer in Claude's own prompt, the card stays until the hook timeout. Answering it then is harmless because Claude Code ignores late hook output.
+If the host does not end the helper when you answer in Claude's own prompt, the card may stay until the hook timeout. What Claude Code does with a late answer is not documented and is listed under Verification results.
 
-Requests that Claude Code would otherwise auto-deny (nobody could answer them) also get a card. If it is ignored, the hook times out and Claude Code's normal behaviour applies. `AskUserQuestion` never reaches the app: the helper exits silently for it.
+According to the Claude Code hooks reference, PermissionRequest also fires where Claude Code would otherwise auto-deny because nobody can answer, so those requests get a card too. A hook that times out or exits without a decision leaves the normal permission flow unchanged. `AskUserQuestion` never reaches the app: the helper exits silently for it.
 
 ## Security model
 
 - **Socket access.** The support directory is mode 0700 and `agent.sock` is mode 0600. On accept the app calls `getpeereid` and closes any connection whose UID differs from its own. A stale socket from a crash is unlinked and rebound at launch.
 - **Never deciding by default.** Every failure path in the helper (bad or oversized input, missing socket, refused connection, read or write error, `pass`) prints nothing. There is no allow-on-timeout and no default answer. Only a click or a hotkey produces Allow, and the hotkeys target the oldest card.
 - **No focus stealing.** Cards are non-activating panels shown with `orderFrontRegardless()`. A card becomes key only when clicked. Hover does not focus it.
-- **Deny rules always win.** The app returns hook decisions through Claude Code's own flow. A hook cannot override a deny rule, so Claude Code's configured rules still apply.
+- **Deny rules always win.** According to the Claude Code hooks reference, a PermissionRequest hook cannot approve something a deny rule refuses, so Claude Code's configured rules still apply.
 - **Always Allow filtering.** Only `addRules` suggestions with `behavior: "allow"` are forwarded, all together, since a compound command can produce several rules. `setMode`, `addDirectories`, `replaceRules` and anything else are dropped because each grants more than "this kind of action". If nothing is left the button is hidden. The card lists the rules and destinations first. Claude Code writes the rules itself; this app never edits permission rules.
+- **Socket override.** `PERMISSION_POPUPS_SOCKET` only changes where the helper connects. The app still enforces the peer UID, and an unreachable socket results in a silent pass.
 - **No HTTP hook.** A localhost HTTP server could be reached by any local process or web page, which could post fake requests and flood the screen with cards. A Unix socket restricted to the user's account, with a peer UID check, avoids that.
 - **No network.** The app opens no network connections. History stays on disk (mode 0600, latest 1,000 entries).
 - **settings.json edits** show the exact change first, refuse invalid or unexpected content (writing nothing), keep a timestamped backup, follow symlinks, re-read after confirmation, and preserve file permissions.
@@ -89,3 +90,4 @@ Items from the design's research section that documentation could not settle. To
 1. Does Claude Code end the hook process when the user answers in Claude's own prompt first? Pending end-to-end test.
 2. The exact deny output shape, confirmed against a live session. Pending end-to-end test.
 3. Does the desktop app pick up a newly added hook without a restart? Pending end-to-end test.
+4. What does Claude Code do with hook output that arrives after the user answered in its own prompt? Pending end-to-end test.
