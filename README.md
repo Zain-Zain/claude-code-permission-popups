@@ -12,7 +12,7 @@ you need a mac and swift
 make install
 ```
 
-then click the shield in the menu bar and hit **Install Claude Code Hook…**. it shows you exactly what it'll change in `~/.claude/settings.json` and backs the file up first.
+then click the shield in the menu bar and install
 
 ## using it
 
