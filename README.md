@@ -22,16 +22,10 @@ if the app isn't running, nothing breaks, claude just asks you like normal.
 
 the menu bar icon has the rest: turn popups on/off, move the cards to another corner, sound, open at login, and a history of what you allowed/denied.
 
-## uninstall
-
+uninstall
 uninstall the hook from the menu, then:
 
 make uninstall
-
-make build
-make test
-make app
-
 
 credits
 me (and CLAUDE)
