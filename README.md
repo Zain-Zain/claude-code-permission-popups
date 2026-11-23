@@ -6,7 +6,7 @@ you get allow, deny and always allow. the card won't steal your focus, so you ca
 
 ## install
 
-you need a mac (macOS 13+) and swift (`xcode-select --install` gets you that, no full xcode needed).
+you need a mac and swift 
 
 ```sh
 make install
